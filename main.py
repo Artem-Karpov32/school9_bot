@@ -1,6 +1,7 @@
 import os
 import asyncio
 import logging
+import random  # <--- Добавили модуль для случайного выбора
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -16,7 +17,6 @@ ADMIN_GROUP_ID = int(os.getenv("ADMIN_GROUP_ID"))
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 # --- БАЗА ЗНАНИЙ (ОСНОВА) ---
-# Сюда мы добавили информацию из ТВОЕГО календаря
 BASE_SYSTEM_PROMPT = """
 Ты — умный помощник первичного отделения Движения Первых МБОУ СОШ №9 г. Брянска.
 Твоя цель: вовлекать школьников, отвечать на вопросы и быть дружелюбным наставником.
@@ -121,17 +121,28 @@ def sections_kb():
 def back_kb(to="main_menu", text="🔙 Назад"):
     return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=text, callback_data=to)]])
 
-# Специальная кнопка отмены для форм
 def cancel_kb():
     return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔙 Отмена / В меню", callback_data="cancel_action")]])
+
+# --- ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ФОТО ---
+def get_random_main_photo():
+    # Список фоток для главного меню
+    photos = ["img/main.jpg", "img/main2.jpg"]
+    selected = random.choice(photos)
+    return FSInputFile(selected)
 
 # --- ХЕНДЛЕРЫ ---
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message, pool):
     await add_user(pool, message.from_user.id, message.from_user.username)
-    # Используем HTML для форматирования
-    photo = FSInputFile("img/main.jpg")
+    
+    # Берем случайное фото
+    try:
+        photo = get_random_main_photo()
+    except:
+        photo = FSInputFile("img/main.jpg") # На случай если второй файл забыл
+
     caption = (
         "👋 <b>Привет!</b>\n"
         "Я — цифровой навигатор первичного отделения <b>МБОУ СОШ №9 г. Брянска</b>.\n\n"
@@ -147,7 +158,13 @@ async def cmd_start(message: types.Message, pool):
 @dp.callback_query(F.data == "main_menu")
 async def nav_main_menu(callback: types.CallbackQuery):
     await callback.message.delete()
-    photo = FSInputFile("img/main.jpg")
+    
+    # И тут тоже берем случайное фото
+    try:
+        photo = get_random_main_photo()
+    except:
+        photo = FSInputFile("img/main.jpg")
+
     caption = "Главное меню. Выбери раздел: 👇"
     await callback.message.answer_photo(photo=photo, caption=caption, reply_markup=main_menu_kb())
 
@@ -261,7 +278,11 @@ async def section_contacts(callback: types.CallbackQuery):
         "🔗 <b>Канал MAX:</b> <a href='https://max.ru/id3234036720_gos'>Перейти</a>"
     )
     await callback.message.delete()
-    await callback.message.answer(text, parse_mode="HTML", reply_markup=back_kb("menu_sections"), disable_web_page_preview=True)
+    try:
+        photo = FSInputFile("img/contacts.jpg")
+        await callback.message.answer_photo(photo, caption=text, parse_mode="HTML", reply_markup=back_kb("menu_sections"), disable_web_page_preview=True)
+    except:
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=back_kb("menu_sections"), disable_web_page_preview=True)
 
 # --- АНКЕТЫ (ВСТУПИТЬ И ИДЕЯ) ---
 
@@ -422,7 +443,7 @@ async def del_menu(callback: types.CallbackQuery, pool):
         await callback.answer("Нечего удалять.", show_alert=True)
         return
     kb_list = [[InlineKeyboardButton(text=f"❌ {e['short_text'][:15]}...", callback_data=f"del_conf_{e['id']}")] for e in events]
-    kb_list.append([InlineKeyboardButton(text="🔙 Отмена", callback_data="main_menu")]) # Добавил кнопку возврата
+    kb_list.append([InlineKeyboardButton(text="🔙 Отмена", callback_data="main_menu")])
     await callback.message.answer("Выберите, что удалить:", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb_list))
 
 @dp.callback_query(F.data.startswith("del_conf_"))
