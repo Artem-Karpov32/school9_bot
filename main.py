@@ -374,17 +374,20 @@ async def chat_with_ai(message: types.Message):
     try:
         # Инициализация GigaChat
         with GigaChat(credentials=GIGACHAT_KEY, verify_ssl_certs=False) as giga:
-            payload = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": message.text}
-            ]
+            # ИСПРАВЛЕНИЕ: Теперь мы передаем не просто список, а словарь с ключом 'messages'
+            payload = {
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": message.text}
+                ]
+            }
             response = giga.chat(payload)
             answer_text = response.choices[0].message.content
             
             await waiting_msg.edit_text(answer_text)
     except Exception as e:
         await waiting_msg.edit_text(f"Прости, я немного завис. Попробуй позже. (Ошибка: {e})")
-
+        
 # --- ЗАПУСК ---
 async def main():
     # Создаем пул соединения с БД
